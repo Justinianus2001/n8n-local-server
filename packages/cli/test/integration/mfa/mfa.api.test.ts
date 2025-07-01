@@ -1,18 +1,17 @@
+import { randomValidPassword, uniqueId } from '@n8n/backend-test-utils';
+import { testDb } from '@n8n/backend-test-utils';
+import { mockInstance } from '@n8n/backend-test-utils';
+import { UserRepository, type User } from '@n8n/db';
 import { Container } from '@n8n/di';
 import { randomString } from 'n8n-workflow';
 
 import { AuthService } from '@/auth/auth.service';
 import config from '@/config';
-import type { User } from '@/databases/entities/user';
-import { AuthUserRepository } from '@/databases/repositories/auth-user.repository';
 import { BadRequestError } from '@/errors/response-errors/bad-request.error';
 import { ExternalHooks } from '@/external-hooks';
 import { TOTPService } from '@/mfa/totp.service';
-import { mockInstance } from '@test/mocking';
 
 import { createOwner, createUser, createUserWithMfaEnabled } from '../shared/db/users';
-import { randomValidPassword, uniqueId } from '../shared/random';
-import * as testDb from '../shared/test-db';
 import * as utils from '../shared/utils';
 
 jest.mock('@/telemetry');
@@ -130,7 +129,7 @@ describe('Enable MFA setup', () => {
 			await testServer.authAgentFor(owner).post('/mfa/verify').send({ mfaCode }).expect(200);
 			await testServer.authAgentFor(owner).post('/mfa/enable').send({ mfaCode }).expect(200);
 
-			const user = await Container.get(AuthUserRepository).findOneOrFail({
+			const user = await Container.get(UserRepository).findOneOrFail({
 				where: {},
 			});
 
@@ -153,7 +152,7 @@ describe('Enable MFA setup', () => {
 
 			await testServer.authAgentFor(owner).post('/mfa/enable').send({ mfaCode }).expect(400);
 
-			const user = await Container.get(AuthUserRepository).findOneOrFail({
+			const user = await Container.get(UserRepository).findOneOrFail({
 				where: {},
 			});
 
@@ -175,7 +174,7 @@ describe('Disable MFA setup', () => {
 			})
 			.expect(200);
 
-		const dbUser = await Container.get(AuthUserRepository).findOneOrFail({
+		const dbUser = await Container.get(UserRepository).findOneOrFail({
 			where: { id: user.id },
 		});
 
@@ -396,7 +395,7 @@ describe('Login', () => {
 			const data = response.body.data;
 			expect(data.mfaEnabled).toBe(true);
 
-			const dbUser = await Container.get(AuthUserRepository).findOneOrFail({
+			const dbUser = await Container.get(UserRepository).findOneOrFail({
 				where: { id: user.id },
 			});
 

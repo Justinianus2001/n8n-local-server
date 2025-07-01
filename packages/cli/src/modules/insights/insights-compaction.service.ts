@@ -1,3 +1,4 @@
+import { Logger } from '@n8n/backend-common';
 import { Service } from '@n8n/di';
 
 import { InsightsByPeriodRepository } from './database/repositories/insights-by-period.repository';
@@ -10,13 +11,16 @@ import { InsightsConfig } from './insights.config';
  */
 @Service()
 export class InsightsCompactionService {
-	private compactInsightsTimer: NodeJS.Timer | undefined;
+	private compactInsightsTimer: NodeJS.Timeout | undefined;
 
 	constructor(
 		private readonly insightsByPeriodRepository: InsightsByPeriodRepository,
 		private readonly insightsRawRepository: InsightsRawRepository,
 		private readonly insightsConfig: InsightsConfig,
-	) {}
+		private readonly logger: Logger,
+	) {
+		this.logger = this.logger.scoped('insights');
+	}
 
 	startCompactionTimer() {
 		this.stopCompactionTimer();
@@ -24,12 +28,14 @@ export class InsightsCompactionService {
 			async () => await this.compactInsights(),
 			this.insightsConfig.compactionIntervalMinutes * 60 * 1000,
 		);
+		this.logger.debug('Started compaction timer');
 	}
 
 	stopCompactionTimer() {
 		if (this.compactInsightsTimer !== undefined) {
 			clearInterval(this.compactInsightsTimer);
 			this.compactInsightsTimer = undefined;
+			this.logger.debug('Stopped compaction timer');
 		}
 	}
 
@@ -38,21 +44,27 @@ export class InsightsCompactionService {
 
 		// Compact raw data to hourly aggregates
 		do {
+			this.logger.debug('Compacting raw data to hourly aggregates');
 			numberOfCompactedRawData = await this.compactRawToHour();
-		} while (numberOfCompactedRawData > 0);
+			this.logger.debug(`Compacted ${numberOfCompactedRawData} raw data to hourly aggregates`);
+		} while (numberOfCompactedRawData === this.insightsConfig.compactionBatchSize);
 
 		let numberOfCompactedHourData: number;
 
 		// Compact hourly data to daily aggregates
 		do {
+			this.logger.debug('Compacting hourly data to daily aggregates');
 			numberOfCompactedHourData = await this.compactHourToDay();
-		} while (numberOfCompactedHourData > 0);
+			this.logger.debug(`Compacted ${numberOfCompactedHourData} hourly data to daily aggregates`);
+		} while (numberOfCompactedHourData === this.insightsConfig.compactionBatchSize);
 
 		let numberOfCompactedDayData: number;
 		// Compact daily data to weekly aggregates
 		do {
+			this.logger.debug('Compacting daily data to weekly aggregates');
 			numberOfCompactedDayData = await this.compactDayToWeek();
-		} while (numberOfCompactedDayData > 0);
+			this.logger.debug(`Compacted ${numberOfCompactedDayData} daily data to weekly aggregates`);
+		} while (numberOfCompactedDayData === this.insightsConfig.compactionBatchSize);
 	}
 
 	/**

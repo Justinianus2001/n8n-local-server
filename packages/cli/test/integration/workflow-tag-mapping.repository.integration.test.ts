@@ -1,10 +1,8 @@
+import { createWorkflow } from '@n8n/backend-test-utils';
+import { testDb } from '@n8n/backend-test-utils';
+import { TagRepository } from '@n8n/db';
+import { WorkflowTagMappingRepository } from '@n8n/db';
 import { Container } from '@n8n/di';
-
-import { TagRepository } from '@/databases/repositories/tag.repository';
-import { WorkflowTagMappingRepository } from '@/databases/repositories/workflow-tag-mapping.repository';
-
-import { createWorkflow } from './shared/db/workflows';
-import * as testDb from './shared/test-db';
 
 describe('WorkflowTagMappingRepository', () => {
 	let taggingRepository: WorkflowTagMappingRepository;
@@ -18,7 +16,7 @@ describe('WorkflowTagMappingRepository', () => {
 	});
 
 	afterEach(async () => {
-		await testDb.truncate(['WorkflowTagMapping', 'Workflow', 'Tag']);
+		await testDb.truncate(['WorkflowTagMapping', 'WorkflowEntity', 'TagEntity']);
 	});
 
 	afterAll(async () => {

@@ -1,24 +1,24 @@
+import { getPersonalProject } from '@n8n/backend-test-utils';
+import { randomCredentialPayload as randomCred } from '@n8n/backend-test-utils';
+import { testDb } from '@n8n/backend-test-utils';
+import { mockInstance } from '@n8n/backend-test-utils';
+import type { Project } from '@n8n/db';
+import type { User } from '@n8n/db';
+import { ProjectRepository } from '@n8n/db';
+import { SharedCredentialsRepository } from '@n8n/db';
+import { SharedWorkflowRepository } from '@n8n/db';
+import { WorkflowRepository } from '@n8n/db';
 import { Container } from '@n8n/di';
 import type { INode, IWorkflowBase } from 'n8n-workflow';
 import { randomInt } from 'n8n-workflow';
 import { v4 as uuid } from 'uuid';
 
-import type { Project } from '@/databases/entities/project';
-import type { User } from '@/databases/entities/user';
-import { ProjectRepository } from '@/databases/repositories/project.repository';
-import { SharedCredentialsRepository } from '@/databases/repositories/shared-credentials.repository';
-import { SharedWorkflowRepository } from '@/databases/repositories/shared-workflow.repository';
-import { WorkflowRepository } from '@/databases/repositories/workflow.repository';
 import { CredentialsPermissionChecker } from '@/executions/pre-execution-checks';
 import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
 import { NodeTypes } from '@/node-types';
 import { OwnershipService } from '@/services/ownership.service';
-import { mockInstance } from '@test/mocking';
 import { affixRoleToSaveCredential } from '@test-integration/db/credentials';
-import { getPersonalProject } from '@test-integration/db/projects';
 import { createOwner, createUser } from '@test-integration/db/users';
-import { randomCredentialPayload as randomCred } from '@test-integration/random';
-import * as testDb from '@test-integration/test-db';
 import type { SaveCredentialFunction } from '@test-integration/types';
 import { mockNodeTypesData } from '@test-integration/utils/node-types-data';
 
@@ -81,7 +81,7 @@ beforeAll(async () => {
 
 describe('check()', () => {
 	beforeEach(async () => {
-		await testDb.truncate(['Workflow', 'Credentials']);
+		await testDb.truncate(['WorkflowEntity', 'CredentialsEntity']);
 	});
 
 	afterAll(async () => {

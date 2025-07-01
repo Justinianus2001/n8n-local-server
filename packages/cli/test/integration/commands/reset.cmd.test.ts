@@ -1,23 +1,21 @@
+import { getPersonalProject, mockInstance } from '@n8n/backend-test-utils';
+import { createWorkflow } from '@n8n/backend-test-utils';
+import { testDb } from '@n8n/backend-test-utils';
+import { randomCredentialPayload } from '@n8n/backend-test-utils';
+import { CredentialsEntity, SettingsRepository } from '@n8n/db';
+import { CredentialsRepository } from '@n8n/db';
+import { SharedCredentialsRepository } from '@n8n/db';
+import { SharedWorkflowRepository } from '@n8n/db';
+import { UserRepository } from '@n8n/db';
 import { Container } from '@n8n/di';
 
 import { Reset } from '@/commands/user-management/reset';
-import { CredentialsEntity } from '@/databases/entities/credentials-entity';
-import { CredentialsRepository } from '@/databases/repositories/credentials.repository';
-import { SettingsRepository } from '@/databases/repositories/settings.repository';
-import { SharedCredentialsRepository } from '@/databases/repositories/shared-credentials.repository';
-import { SharedWorkflowRepository } from '@/databases/repositories/shared-workflow.repository';
-import { UserRepository } from '@/databases/repositories/user.repository';
 import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
 import { NodeTypes } from '@/node-types';
 import { setupTestCommand } from '@test-integration/utils/test-command';
 
-import { mockInstance } from '../../shared/mocking';
 import { encryptCredentialData, saveCredential } from '../shared/db/credentials';
-import { getPersonalProject } from '../shared/db/projects';
 import { createMember, createUser } from '../shared/db/users';
-import { createWorkflow } from '../shared/db/workflows';
-import { randomCredentialPayload } from '../shared/random';
-import * as testDb from '../shared/test-db';
 
 mockInstance(LoadNodesAndCredentials);
 mockInstance(NodeTypes);

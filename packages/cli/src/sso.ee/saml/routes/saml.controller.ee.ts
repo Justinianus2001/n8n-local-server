@@ -1,4 +1,5 @@
 import { SamlAcsDto, SamlPreferences, SamlToggleDto } from '@n8n/api-types';
+import { AuthenticatedRequest } from '@n8n/db';
 import { Get, Post, RestController, GlobalScope, Body } from '@n8n/decorators';
 import { Response } from 'express';
 import querystring from 'querystring';
@@ -8,7 +9,7 @@ import url from 'url';
 import { AuthService } from '@/auth/auth.service';
 import { AuthError } from '@/errors/response-errors/auth.error';
 import { EventService } from '@/events/event.service';
-import { AuthenticatedRequest, AuthlessRequest } from '@/requests';
+import { AuthlessRequest } from '@/requests';
 import { sendErrorResponse } from '@/response-helper';
 import { UrlService } from '@/services/url.service';
 
@@ -164,7 +165,7 @@ export class SamlController {
 	 * This endpoint is available if SAML is licensed and enabled
 	 */
 	@Get('/initsso', { middlewares: [samlLicensedAndEnabledMiddleware], skipAuth: true })
-	async initSsoGet(req: AuthlessRequest, res: Response) {
+	async initSsoGet(req: AuthlessRequest<{}, {}, {}, { redirect?: string }>, res: Response) {
 		let redirectUrl = '';
 		try {
 			const refererUrl = req.headers.referer;
@@ -180,7 +181,7 @@ export class SamlController {
 		} catch {
 			// ignore
 		}
-		return await this.handleInitSSO(res, redirectUrl);
+		return await this.handleInitSSO(res, redirectUrl || (req.query.redirect ?? ''));
 	}
 
 	/**

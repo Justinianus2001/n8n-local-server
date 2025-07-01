@@ -12,6 +12,18 @@ before(() => {
 	Cypress.on('uncaught:exception', (error) => {
 		return !error.message.includes('ResizeObserver');
 	});
+
+	// Mock the clipboard API because in newer versions of cypress the clipboard API is flaky when the window is not focussed.
+	Cypress.on('window:before:load', (win) => {
+		let currentContent: string = '';
+		Object.assign(win.navigator.clipboard, {
+			writeText: async (text: string) => {
+				currentContent = text;
+				return await Promise.resolve();
+			},
+			readText: async () => await Promise.resolve(currentContent),
+		});
+	});
 });
 
 beforeEach(() => {
@@ -82,4 +94,16 @@ beforeEach(() => {
 			description: 'Includes <strong>core functionality</strong> and <strong>bug fixes</strong>',
 		},
 	]).as('getVersions');
+	cy.intercept(
+		{ pathname: '/api/whats-new' },
+		{
+			id: 1,
+			title: "What's new",
+			calloutText: '',
+			footer: '',
+			createdAt: '2025-06-27T14:55:58.717Z',
+			updatedAt: '2025-06-27T15:06:44.092Z',
+			items: [],
+		},
+	).as('getWhatsNew');
 });

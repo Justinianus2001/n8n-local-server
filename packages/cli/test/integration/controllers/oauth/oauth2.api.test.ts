@@ -1,3 +1,6 @@
+import { testDb } from '@n8n/backend-test-utils';
+import type { CredentialsEntity } from '@n8n/db';
+import type { User } from '@n8n/db';
 import { Container } from '@n8n/di';
 import { response as Response } from 'express';
 import nock from 'nock';
@@ -5,11 +8,8 @@ import { parse as parseQs } from 'querystring';
 
 import { OAuth2CredentialController } from '@/controllers/oauth/oauth2-credential.controller';
 import { CredentialsHelper } from '@/credentials-helper';
-import type { CredentialsEntity } from '@/databases/entities/credentials-entity';
-import type { User } from '@/databases/entities/user';
 import { saveCredential } from '@test-integration/db/credentials';
 import { createMember, createOwner } from '@test-integration/db/users';
-import * as testDb from '@test-integration/test-db';
 import type { SuperAgentTest } from '@test-integration/types';
 import { setupTestServer } from '@test-integration/utils';
 
@@ -38,7 +38,7 @@ describe('OAuth2 API', () => {
 	});
 
 	beforeEach(async () => {
-		await testDb.truncate(['SharedCredentials', 'Credentials']);
+		await testDb.truncate(['SharedCredentials', 'CredentialsEntity']);
 		credential = await saveCredential(
 			{
 				name: 'Test',

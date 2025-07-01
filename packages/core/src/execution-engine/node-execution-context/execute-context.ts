@@ -1,7 +1,9 @@
 import type {
 	AINodeConnectionType,
 	CallbackManager,
+	ChunkType,
 	CloseFunction,
+	IDataObject,
 	IExecuteData,
 	IExecuteFunctions,
 	IExecuteResponsePromiseData,
@@ -13,6 +15,7 @@ import type {
 	IWorkflowExecuteAdditionalData,
 	NodeExecutionHint,
 	Result,
+	StructuredChunk,
 	Workflow,
 	WorkflowExecuteMode,
 } from 'n8n-workflow';
@@ -20,6 +23,7 @@ import {
 	ApplicationError,
 	createDeferredPromise,
 	createEnvProviderState,
+	jsonParse,
 	NodeConnectionTypes,
 } from 'n8n-workflow';
 
@@ -127,6 +131,23 @@ export class ExecuteContext extends BaseExecuteContext implements IExecuteFuncti
 			)) as IExecuteFunctions['getNodeParameter'];
 	}
 
+	async sendChunk(type: ChunkType, content?: IDataObject | string): Promise<void> {
+		const node = this.getNode();
+		const metadata = {
+			nodeId: node.id,
+			nodeName: node.name,
+			timestamp: Date.now(),
+		};
+
+		const message: StructuredChunk = {
+			type,
+			content: content ? JSON.stringify(content) : undefined,
+			metadata,
+		};
+
+		await this.additionalData.hooks?.runHook('sendChunk', [message]);
+	}
+
 	async startJob<T = unknown, E = unknown>(
 		jobType: string,
 		settings: unknown,
@@ -183,7 +204,10 @@ export class ExecuteContext extends BaseExecuteContext implements IExecuteFuncti
 
 	logNodeOutput(...args: unknown[]): void {
 		if (this.mode === 'manual') {
-			this.sendMessageToUI(...args);
+			const parsedLogArgs = args.map((arg) =>
+				typeof arg === 'string' ? jsonParse(arg, { fallbackValue: arg }) : arg,
+			);
+			this.sendMessageToUI(...parsedLogArgs);
 			return;
 		}
 

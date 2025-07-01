@@ -1,6 +1,9 @@
-jest.mock('@/constants', () => ({
-	inProduction: true,
-}));
+jest.mock('@n8n/backend-common', () => {
+	return {
+		...jest.requireActual('@n8n/backend-common'),
+		inProduction: true,
+	};
+});
 
 import type { GlobalConfig } from '@n8n/config';
 import { ControllerRegistryMetadata } from '@n8n/decorators';
@@ -14,6 +17,7 @@ import { agent as testAgent } from 'supertest';
 import type { AuthService } from '@/auth/auth.service';
 import { ControllerRegistry } from '@/controller.registry';
 import type { License } from '@/license';
+import type { LastActiveAtService } from '@/services/last-active-at.service';
 import type { SuperAgentTest } from '@test-integration/types';
 
 describe('ControllerRegistry', () => {
@@ -21,12 +25,19 @@ describe('ControllerRegistry', () => {
 	const authService = mock<AuthService>();
 	const globalConfig = mock<GlobalConfig>({ endpoints: { rest: 'rest' } });
 	const metadata = Container.get(ControllerRegistryMetadata);
+	const lastActiveAtService = mock<LastActiveAtService>();
 	let agent: SuperAgentTest;
 
 	beforeEach(() => {
 		jest.resetAllMocks();
 		const app = express();
-		new ControllerRegistry(license, authService, globalConfig, metadata).activate(app);
+		new ControllerRegistry(
+			license,
+			authService,
+			globalConfig,
+			metadata,
+			lastActiveAtService,
+		).activate(app);
 		agent = testAgent(app);
 	});
 
@@ -47,6 +58,7 @@ describe('ControllerRegistry', () => {
 
 		beforeEach(() => {
 			authService.authMiddleware.mockImplementation(async (_req, _res, next) => next());
+			lastActiveAtService.middleware.mockImplementation(async (_req, _res, next) => next());
 		});
 
 		it('should not rate-limit by default', async () => {
@@ -105,18 +117,19 @@ describe('ControllerRegistry', () => {
 
 		beforeEach(() => {
 			authService.authMiddleware.mockImplementation(async (_req, _res, next) => next());
+			lastActiveAtService.middleware.mockImplementation(async (_req, _res, next) => next());
 		});
 
 		it('should disallow when feature is missing', async () => {
-			license.isFeatureEnabled.calledWith('feat:sharing').mockReturnValue(false);
+			license.isLicensed.calledWith('feat:sharing').mockReturnValue(false);
 			await agent.get('/rest/test/with-sharing').expect(403);
-			expect(license.isFeatureEnabled).toHaveBeenCalled();
+			expect(license.isLicensed).toHaveBeenCalled();
 		});
 
 		it('should allow when feature is available', async () => {
-			license.isFeatureEnabled.calledWith('feat:sharing').mockReturnValue(true);
+			license.isLicensed.calledWith('feat:sharing').mockReturnValue(true);
 			await agent.get('/rest/test/with-sharing').expect(200);
-			expect(license.isFeatureEnabled).toHaveBeenCalled();
+			expect(license.isLicensed).toHaveBeenCalled();
 		});
 	});
 
@@ -133,6 +146,7 @@ describe('ControllerRegistry', () => {
 
 		beforeEach(() => {
 			authService.authMiddleware.mockImplementation(async (_req, _res, next) => next());
+			lastActiveAtService.middleware.mockImplementation(async (_req, _res, next) => next());
 		});
 
 		it('should pass in correct args to the route handler', async () => {

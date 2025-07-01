@@ -9,21 +9,20 @@ import {
 import RunData from './RunData.vue';
 import RunInfo from './RunInfo.vue';
 import { storeToRefs } from 'pinia';
-import { useUIStore } from '@/stores/ui.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { useNDVStore } from '@/stores/ndv.store';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 import RunDataAi from './RunDataAi/RunDataAi.vue';
-import { ndvEventBus } from '@/event-bus';
 import { useNodeType } from '@/composables/useNodeType';
 import { usePinnedData } from '@/composables/usePinnedData';
 import { useTelemetry } from '@/composables/useTelemetry';
-import { useI18n } from '@/composables/useI18n';
+import { useI18n } from '@n8n/i18n';
 import { waitingNodeTooltip } from '@/utils/executionUtils';
 import { N8nRadioButtons, N8nText } from '@n8n/design-system';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useNodeDirtiness } from '@/composables/useNodeDirtiness';
 import { CanvasNodeDirtiness } from '@/types';
+import { type IRunDataDisplayMode } from '@/Interface';
 
 // Types
 
@@ -48,6 +47,7 @@ type Props = {
 	blockUI?: boolean;
 	isProductionExecutionPreview?: boolean;
 	isPaneActive?: boolean;
+	displayMode: IRunDataDisplayMode;
 };
 
 // Props and emits
@@ -67,6 +67,7 @@ const emit = defineEmits<{
 	itemHover: [item: { itemIndex: number; outputIndex: number } | null];
 	search: [string];
 	openSettings: [];
+	displayModeChange: [IRunDataDisplayMode];
 }>();
 
 // Stores
@@ -74,7 +75,6 @@ const emit = defineEmits<{
 const ndvStore = useNDVStore();
 const nodeTypesStore = useNodeTypesStore();
 const workflowsStore = useWorkflowsStore();
-const uiStore = useUIStore();
 const telemetry = useTelemetry();
 const i18n = useI18n();
 const { activeNode } = storeToRefs(ndvStore);
@@ -88,7 +88,7 @@ const { isSubNodeType } = useNodeType({
 });
 const pinnedData = usePinnedData(activeNode, {
 	runIndex: props.runIndex,
-	displayMode: ndvStore.outputPanelDisplayMode,
+	displayMode: props.displayMode,
 });
 
 // Data
@@ -141,7 +141,7 @@ const isNodeRunning = computed(() => {
 	return workflowRunning.value && !!node.value && workflowsStore.isNodeExecuting(node.value.name);
 });
 
-const workflowRunning = computed(() => uiStore.isActionActive.workflowRunning);
+const workflowRunning = computed(() => workflowsStore.isWorkflowRunning);
 
 const workflowExecution = computed(() => {
 	return workflowsStore.getWorkflowExecution;
@@ -293,14 +293,6 @@ const onRunIndexChange = (run: number) => {
 	emit('runChange', run);
 };
 
-const onUpdateOutputMode = (newOutputMode: OutputType) => {
-	if (newOutputMode === OUTPUT_TYPE.LOGS) {
-		ndvEventBus.emit('setPositionByName', 'minLeft');
-	} else {
-		ndvEventBus.emit('setPositionByName', 'initial');
-	}
-};
-
 // Set the initial output mode when the component is mounted
 onMounted(() => {
 	outputMode.value = defaultOutputMode.value;
@@ -341,6 +333,8 @@ const activatePane = () => {
 		pane-type="output"
 		:data-output-type="outputMode"
 		:callout-message="allToolsWereUnusedNotice"
+		:display-mode="displayMode"
+		:disable-ai-content="true"
 		@activate-pane="activatePane"
 		@run-change="onRunIndexChange"
 		@link-run="onLinkRun"
@@ -348,6 +342,7 @@ const activatePane = () => {
 		@table-mounted="emit('tableMounted', $event)"
 		@item-hover="emit('itemHover', $event)"
 		@search="emit('search', $event)"
+		@display-mode-change="emit('displayModeChange', $event)"
 	>
 		<template #header>
 			<div :class="$style.titleSection">
@@ -356,7 +351,6 @@ const activatePane = () => {
 						v-model="outputMode"
 						data-test-id="ai-output-mode-select"
 						:options="outputTypes"
-						@update:model-value="onUpdateOutputMode"
 					/>
 				</template>
 				<span v-else :class="$style.title">
@@ -398,7 +392,9 @@ const activatePane = () => {
 		</template>
 
 		<template #node-waiting>
-			<N8nText :bold="true" color="text-dark" size="large">Waiting for input</N8nText>
+			<N8nText :bold="true" color="text-dark" size="large">
+				{{ i18n.baseText('ndv.output.waitNodeWaiting.title') }}
+			</N8nText>
 			<N8nText v-n8n-html="waitingNodeTooltip(node)"></N8nText>
 		</template>
 

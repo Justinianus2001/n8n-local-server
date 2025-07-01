@@ -11,7 +11,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import Draggable from '@/components/Draggable.vue';
 import MappingPill from './MappingPill.vue';
 import TextWithHighlights from './TextWithHighlights.vue';
-import { useI18n } from '@/composables/useI18n';
+import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { N8nIconButton, N8nInfoTip, N8nTooltip, N8nTree } from '@n8n/design-system';
 import { storeToRefs } from 'pinia';
@@ -308,9 +308,7 @@ function onDragEnd(column: string, src: string, depth = '0') {
 
 		void externalHooks.run('runDataTable.onDragEnd', telemetryPayload);
 
-		telemetry.track('User dragged data for mapping', telemetryPayload, {
-			withPostHog: true,
-		});
+		telemetry.track('User dragged data for mapping', telemetryPayload);
 	}, 1000); // ensure dest data gets set if drop
 }
 
@@ -481,7 +479,7 @@ watch(focusedMappableInput, (curr) => {
 								v-show="showExecutionLink(index1)"
 								element="a"
 								type="secondary"
-								icon="external-link-alt"
+								icon="external-link"
 								data-test-id="debug-sub-execution"
 								size="mini"
 								target="_blank"
@@ -543,7 +541,7 @@ watch(focusedMappableInput, (curr) => {
 											:search="search"
 										/>
 										<div :class="$style.dragButton">
-											<font-awesome-icon icon="grip-vertical" />
+											<n8n-icon icon="grip-vertical" />
 										</div>
 									</div>
 								</template>
@@ -565,10 +563,7 @@ watch(focusedMappableInput, (curr) => {
 								</div>
 							</template>
 							<span>
-								<font-awesome-icon
-									:class="$style['warningTooltip']"
-									icon="exclamation-triangle"
-								></font-awesome-icon>
+								<n8n-icon :class="$style['warningTooltip']" icon="triangle-alert" />
 								{{ i18n.baseText('dataMapping.tableView.tableColumnsExceeded') }}
 							</span>
 						</N8nTooltip>
@@ -620,7 +615,7 @@ watch(focusedMappableInput, (curr) => {
 								v-show="showExecutionLink(index1)"
 								element="a"
 								type="secondary"
-								icon="external-link-alt"
+								icon="external-link"
 								data-test-id="debug-sub-execution"
 								size="mini"
 								target="_blank"

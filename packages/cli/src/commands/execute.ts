@@ -1,10 +1,10 @@
+import { WorkflowRepository } from '@n8n/db';
 import { Container } from '@n8n/di';
 import { Flags } from '@oclif/core';
 import type { IWorkflowBase, IWorkflowExecutionDataProcess } from 'n8n-workflow';
 import { ExecutionBaseError, UnexpectedError, UserError } from 'n8n-workflow';
 
 import { ActiveExecutions } from '@/active-executions';
-import { WorkflowRepository } from '@/databases/repositories/workflow.repository';
 import { OwnershipService } from '@/services/ownership.service';
 import { findCliWorkflowStart, isWorkflowIdValid } from '@/utils';
 import { WorkflowRunner } from '@/workflow-runner';
@@ -28,6 +28,8 @@ export class Execute extends BaseCommand {
 	};
 
 	override needsCommunityPackages = true;
+
+	override needsTaskRunner = true;
 
 	async init() {
 		await super.init();
@@ -107,7 +109,7 @@ export class Execute extends BaseCommand {
 			this.logger.info(JSON.stringify(data, null, 2));
 
 			const { error } = data.data.resultData;
-			// eslint-disable-next-line @typescript-eslint/no-throw-literal
+			// eslint-disable-next-line @typescript-eslint/only-throw-error
 			throw {
 				...error,
 				stack: error.stack,

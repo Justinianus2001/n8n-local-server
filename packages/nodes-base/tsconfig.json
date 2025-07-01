@@ -5,8 +5,10 @@
 	],
 	"compilerOptions": {
 		"paths": {
+			"@credentials/*": ["./credentials/*"],
 			"@test/*": ["./test/*"],
-			"@utils/*": ["./utils/*"]
+			"@utils/*": ["./utils/*"],
+			"@nodes-testing/*": ["../core/nodes-testing/*"]
 		},
 		"tsBuildInfoFile": "dist/typecheck.tsbuildinfo",
 		"emitDecoratorMetadata": true,
@@ -25,7 +27,7 @@
 	],
 	"references": [
 		{ "path": "../@n8n/imap/tsconfig.build.json" },
-		{ "path": "../workflow/tsconfig.build.json" },
+		{ "path": "../workflow/tsconfig.build.esm.json" },
 		{ "path": "../core/tsconfig.build.json" }
 	]
 }

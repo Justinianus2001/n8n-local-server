@@ -3,7 +3,7 @@ import type { IUpdateInformation } from '@/Interface';
 import InputTriple from '@/components/InputTriple/InputTriple.vue';
 import ParameterInputFull from '@/components/ParameterInputFull.vue';
 import ParameterIssues from '@/components/ParameterIssues.vue';
-import { useI18n } from '@/composables/useI18n';
+import { useI18n } from '@n8n/i18n';
 import { DateTime } from 'luxon';
 import type {
 	FilterConditionValue,
@@ -168,7 +168,7 @@ const onBlur = (): void => {
 			type="tertiary"
 			text
 			size="mini"
-			icon="trash"
+			icon="trash-2"
 			data-test-id="filter-remove-condition"
 			:title="i18n.baseText('filter.removeCondition')"
 			:class="[$style.iconButton, $style.extraTopPadding]"
@@ -231,7 +231,7 @@ const onBlur = (): void => {
 				<template #content>
 					{{ i18n.baseText('filter.condition.resolvedTrue') }}
 				</template>
-				<n8n-icon :class="$style.statusIcon" icon="check-circle" size="medium" color="text-light" />
+				<n8n-icon :class="$style.statusIcon" icon="circle-check" size="medium" color="text-light" />
 			</n8n-tooltip>
 
 			<n8n-tooltip
@@ -241,7 +241,7 @@ const onBlur = (): void => {
 				<template #content>
 					{{ i18n.baseText('filter.condition.resolvedFalse') }}
 				</template>
-				<n8n-icon :class="$style.statusIcon" icon="times-circle" size="medium" color="text-light" />
+				<n8n-icon :class="$style.statusIcon" icon="circle-x" size="medium" color="text-light" />
 			</n8n-tooltip>
 		</div>
 	</div>

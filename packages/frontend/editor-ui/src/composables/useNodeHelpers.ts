@@ -1,12 +1,8 @@
 import { ref } from 'vue';
 import { useHistoryStore } from '@/stores/history.store';
-import {
-	CUSTOM_API_CALL_KEY,
-	PLACEHOLDER_FILLED_AT_EXECUTION_TIME,
-	SPLIT_IN_BATCHES_NODE_TYPE,
-} from '@/constants';
+import { CUSTOM_API_CALL_KEY, PLACEHOLDER_FILLED_AT_EXECUTION_TIME } from '@/constants';
 
-import { NodeHelpers, ExpressionEvaluatorProxy, NodeConnectionTypes } from 'n8n-workflow';
+import { NodeHelpers, NodeConnectionTypes } from 'n8n-workflow';
 import type {
 	INodeProperties,
 	INodeCredentialDescription,
@@ -33,6 +29,7 @@ import type {
 } from 'n8n-workflow';
 
 import type {
+	AddedNode,
 	ICredentialsResponse,
 	INodeUi,
 	INodeUpdatePropertiesInformation,
@@ -41,12 +38,11 @@ import type {
 
 import { isString } from '@/utils/typeGuards';
 import { isObject } from '@/utils/objectUtils';
-import { useSettingsStore } from '@/stores/settings.store';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { useNodeTypesStore } from '@/stores/nodeTypes.store';
 import { useCredentialsStore } from '@/stores/credentials.store';
-import { get } from 'lodash-es';
-import { useI18n } from './useI18n';
+import get from 'lodash/get';
+import { useI18n } from '@n8n/i18n';
 import { EnableNodeToggleCommand } from '@/models/history';
 import { useTelemetry } from './useTelemetry';
 import { hasPermission } from '@/utils/rbac/permissions';
@@ -546,27 +542,35 @@ export function useNodeHelpers() {
 		}
 	}
 
-	function getNodeTaskData(node: INodeUi | null, runIndex = 0) {
-		if (node === null) {
-			return null;
-		}
-		if (workflowsStore.getWorkflowExecution === null) {
-			return null;
-		}
+	function getNodeTaskData(nodeName: string, runIndex = 0, execution?: IRunExecutionData) {
+		return getAllNodeTaskData(nodeName, execution)?.[runIndex] ?? null;
+	}
 
-		const executionData = workflowsStore.getWorkflowExecution.data;
-		if (!executionData?.resultData) {
-			// unknown status
-			return null;
-		}
-		const runData = executionData.resultData.runData;
+	function getAllNodeTaskData(nodeName: string, execution?: IRunExecutionData) {
+		const runData = execution?.resultData.runData ?? workflowsStore.getWorkflowRunData;
 
-		const taskData = get(runData, [node.name, runIndex]);
-		if (!taskData) {
-			return null;
-		}
+		return runData?.[nodeName] ?? null;
+	}
 
-		return taskData;
+	function hasNodeExecuted(nodeName: string) {
+		return (
+			getAllNodeTaskData(nodeName)?.some(
+				({ executionStatus }) => executionStatus && ['success', 'error'].includes(executionStatus),
+			) ?? false
+		);
+	}
+
+	function getLastRunIndexWithData(
+		nodeName: string,
+		outputIndex = 0,
+		connectionType: NodeConnectionType = NodeConnectionTypes.Main,
+	) {
+		const allTaskData = getAllNodeTaskData(nodeName) ?? [];
+
+		return allTaskData.findLastIndex(
+			(taskData) =>
+				taskData.data && getInputData(taskData.data, outputIndex, connectionType).length > 0,
+		);
 	}
 
 	function getNodeInputData(
@@ -575,18 +579,10 @@ export function useNodeHelpers() {
 		outputIndex = 0,
 		paneType: NodePanelType = 'output',
 		connectionType: NodeConnectionType = NodeConnectionTypes.Main,
+		execution?: IRunExecutionData,
 	): INodeExecutionData[] {
-		//TODO: check if this needs to be fixed in different place
-		if (
-			node?.type === SPLIT_IN_BATCHES_NODE_TYPE &&
-			paneType === 'input' &&
-			runIndex !== 0 &&
-			outputIndex !== 0
-		) {
-			runIndex = runIndex - 1;
-		}
-
-		const taskData = getNodeTaskData(node, runIndex);
+		if (!node) return [];
+		const taskData = getNodeTaskData(node.name, runIndex, execution);
 		if (taskData === null) {
 			return [];
 		}
@@ -706,9 +702,6 @@ export function useNodeHelpers() {
 
 		if (nodeType?.subtitle !== undefined) {
 			try {
-				ExpressionEvaluatorProxy.setEvaluator(
-					useSettingsStore().settings.expressions?.evaluator ?? 'tmpl',
-				);
 				return workflow.expression.getSimpleParameterValue(
 					data,
 					nodeType.subtitle,
@@ -994,6 +987,21 @@ export function useNodeHelpers() {
 		return nodeIssues;
 	}
 
+	function getDefaultNodeName(node: AddedNode | INode) {
+		const nodeType = nodeTypesStore.getNodeType(node.type, node.typeVersion);
+		if (nodeType === null) return null;
+		const parameters = NodeHelpers.getNodeParameters(
+			nodeType?.properties,
+			node.parameters ?? {},
+			true,
+			false,
+			node.typeVersion ? { typeVersion: node.typeVersion } : null,
+			nodeType,
+		);
+
+		return NodeHelpers.makeNodeName(parameters ?? {}, nodeType);
+	}
+
 	return {
 		hasProxyAuth,
 		isCustomApiCallSelected,
@@ -1012,6 +1020,8 @@ export function useNodeHelpers() {
 		disableNodes,
 		getNodeSubtitle,
 		updateNodesCredentialsIssues,
+		getLastRunIndexWithData,
+		hasNodeExecuted,
 		getNodeInputData,
 		matchCredentials,
 		isInsertingNodes,
@@ -1025,5 +1035,6 @@ export function useNodeHelpers() {
 		isSingleExecution,
 		getNodeHints,
 		nodeIssuesToString,
+		getDefaultNodeName,
 	};
 }

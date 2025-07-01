@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, watch } from 'vue';
 
-import { get } from 'lodash-es';
+import get from 'lodash/get';
 
 import type {
 	INodeUi,
@@ -23,7 +23,7 @@ import type {
 	IParameterLabel,
 	NodeParameterValueType,
 } from 'n8n-workflow';
-import { CREDENTIAL_EMPTY_VALUE, NodeHelpers } from 'n8n-workflow';
+import { CREDENTIAL_EMPTY_VALUE, isResourceLocatorValue, NodeHelpers } from 'n8n-workflow';
 
 import CodeNodeEditor from '@/components/CodeNodeEditor/CodeNodeEditor.vue';
 import CredentialsSelect from '@/components/CredentialsSelect.vue';
@@ -38,7 +38,6 @@ import SqlEditor from '@/components/SqlEditor/SqlEditor.vue';
 import TextEdit from '@/components/TextEdit.vue';
 
 import { hasExpressionMapping, isValueExpression } from '@/utils/nodeTypesUtils';
-import { isResourceLocatorValue } from '@/utils/typeGuards';
 
 import {
 	AI_TRANSFORM_NODE_TYPE,
@@ -51,7 +50,7 @@ import {
 
 import { useDebounce } from '@/composables/useDebounce';
 import { useExternalHooks } from '@/composables/useExternalHooks';
-import { useI18n } from '@/composables/useI18n';
+import { useI18n } from '@n8n/i18n';
 import { useNodeHelpers } from '@/composables/useNodeHelpers';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useWorkflowHelpers } from '@/composables/useWorkflowHelpers';
@@ -65,12 +64,13 @@ import { isCredentialOnlyNodeType } from '@/utils/credentialOnlyNodes';
 import { N8nIcon, N8nInput, N8nInputNumber, N8nOption, N8nSelect } from '@n8n/design-system';
 import type { EventBus } from '@n8n/utils/event-bus';
 import { createEventBus } from '@n8n/utils/event-bus';
-import { useRouter } from 'vue-router';
 import { useElementSize } from '@vueuse/core';
 import { captureMessage } from '@sentry/vue';
 import { completeExpressionSyntax, shouldConvertToExpression } from '@/utils/expressions';
 import { isPresent } from '@/utils/typesUtils';
 import CssEditor from './CssEditor/CssEditor.vue';
+import { useUIStore } from '@/stores/ui.store';
+import { useFocusPanelStore } from '@/stores/focusPanel.store';
 
 type Picker = { $emit: (arg0: string, arg1: Date) => void };
 
@@ -124,8 +124,7 @@ const externalHooks = useExternalHooks();
 const i18n = useI18n();
 const nodeHelpers = useNodeHelpers();
 const { debounce } = useDebounce();
-const router = useRouter();
-const workflowHelpers = useWorkflowHelpers({ router });
+const workflowHelpers = useWorkflowHelpers();
 const telemetry = useTelemetry();
 
 const credentialsStore = useCredentialsStore();
@@ -133,6 +132,8 @@ const ndvStore = useNDVStore();
 const workflowsStore = useWorkflowsStore();
 const settingsStore = useSettingsStore();
 const nodeTypesStore = useNodeTypesStore();
+const uiStore = useUIStore();
+const focusPanelStore = useFocusPanelStore();
 
 // ESLint: false positive
 // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-duplicate-type-constituents
@@ -397,6 +398,21 @@ const getIssues = computed<string[]>(() => {
 		issues.parameters[props.parameter.name] = [
 			`There was a problem loading the parameter options from server: "${remoteParameterOptionsLoadingIssues.value}"`,
 		];
+	} else if (props.parameter.type === 'workflowSelector') {
+		const selected = modelValueResourceLocator.value?.value;
+		if (selected) {
+			const isSelectedArchived = workflowsStore.allWorkflows.some(
+				(resource) => resource.id === selected && resource.isArchived,
+			);
+
+			if (isSelectedArchived) {
+				if (issues.parameters === undefined) {
+					issues.parameters = {};
+				}
+				const issue = i18n.baseText('parameterInput.selectedWorkflowIsArchived');
+				issues.parameters[props.parameter.name] = [issue];
+			}
+		}
 	}
 
 	if (issues?.parameters?.[props.parameter.name] !== undefined) {
@@ -605,20 +621,24 @@ function skipCheck(value: string | number | boolean | null) {
 
 function getPlaceholder(): string {
 	return props.isForCredential
-		? i18n.credText().placeholder(props.parameter)
-		: i18n.nodeText().placeholder(props.parameter, props.path);
+		? i18n.credText(uiStore.activeCredentialType).placeholder(props.parameter)
+		: i18n.nodeText(ndvStore.activeNode?.type).placeholder(props.parameter, props.path);
 }
 
 function getOptionsOptionDisplayName(option: INodePropertyOptions): string {
 	return props.isForCredential
-		? i18n.credText().optionsOptionDisplayName(props.parameter, option)
-		: i18n.nodeText().optionsOptionDisplayName(props.parameter, option, props.path);
+		? i18n.credText(uiStore.activeCredentialType).optionsOptionDisplayName(props.parameter, option)
+		: i18n
+				.nodeText(ndvStore.activeNode?.type)
+				.optionsOptionDisplayName(props.parameter, option, props.path);
 }
 
 function getOptionsOptionDescription(option: INodePropertyOptions): string {
 	return props.isForCredential
-		? i18n.credText().optionsOptionDescription(props.parameter, option)
-		: i18n.nodeText().optionsOptionDescription(props.parameter, option, props.path);
+		? i18n.credText(uiStore.activeCredentialType).optionsOptionDescription(props.parameter, option)
+		: i18n
+				.nodeText(ndvStore.activeNode?.type)
+				.optionsOptionDescription(props.parameter, option, props.path);
 }
 
 async function loadRemoteParameterOptions() {
@@ -763,6 +783,16 @@ function onPaste(event: ClipboardEvent) {
 		input.selectionStart = input.selectionEnd = start + withExpressionPrefix.length;
 
 		valueChanged(input.value);
+	}
+}
+
+function onPasteNumber(event: ClipboardEvent) {
+	const pastedText = event.clipboardData?.getData('text');
+
+	if (shouldConvertToExpression(pastedText)) {
+		event.preventDefault();
+		valueChanged('=' + pastedText);
+		return;
 	}
 }
 
@@ -1015,6 +1045,23 @@ async function optionSelected(command: string) {
 		telemetry.track('User switched parameter mode', telemetryPayload);
 		void externalHooks.run('parameterInput.modeSwitch', telemetryPayload);
 	}
+
+	if (node.value && command === 'focus') {
+		focusPanelStore.setFocusedNodeParameter({
+			nodeName: node.value.name,
+			parameterPath: props.path,
+			parameter: props.parameter,
+			value: modelValueString.value,
+		});
+
+		if (ndvStore.activeNode) {
+			ndvStore.activeNodeName = null;
+			// TODO: check what this does - close method on NodeDetailsView
+			ndvStore.resetNDVPushRef();
+		}
+
+		focusPanelStore.focusPanelActive = true;
+	}
 }
 
 onMounted(() => {
@@ -1260,7 +1307,7 @@ onUpdated(async () => {
 					:model-value="codeEditDialogVisible"
 					:append-to="`#${APP_MODALS_ELEMENT_ID}`"
 					:title="`${i18n.baseText('codeEdit.edit')} ${i18n
-						.nodeText()
+						.nodeText(ndvStore.activeNode?.type)
 						.inputLabelDisplayName(parameter, path)}`"
 					:before-close="closeCodeEditDialog"
 					data-test-id="code-editor-fullscreen"
@@ -1352,7 +1399,7 @@ onUpdated(async () => {
 						<N8nIcon
 							v-if="!editorIsReadOnly"
 							data-test-id="code-editor-fullscreen-button"
-							icon="external-link-alt"
+							icon="external-link"
 							size="xsmall"
 							class="textarea-modal-opener"
 							:title="i18n.baseText('parameterInput.openEditWindow')"
@@ -1373,7 +1420,7 @@ onUpdated(async () => {
 					<template #suffix>
 						<N8nIcon
 							data-test-id="code-editor-fullscreen-button"
-							icon="external-link-alt"
+							icon="external-link"
 							size="xsmall"
 							class="textarea-modal-opener"
 							:title="i18n.baseText('parameterInput.openEditWindow')"
@@ -1392,7 +1439,7 @@ onUpdated(async () => {
 					<template #suffix>
 						<N8nIcon
 							data-test-id="code-editor-fullscreen-button"
-							icon="external-link-alt"
+							icon="external-link"
 							size="xsmall"
 							class="textarea-modal-opener"
 							:title="i18n.baseText('parameterInput.openEditWindow')"
@@ -1412,7 +1459,7 @@ onUpdated(async () => {
 					<template #suffix>
 						<N8nIcon
 							data-test-id="code-editor-fullscreen-button"
-							icon="external-link-alt"
+							icon="external-link"
 							size="xsmall"
 							class="textarea-modal-opener"
 							:title="i18n.baseText('parameterInput.openEditWindow')"
@@ -1433,7 +1480,7 @@ onUpdated(async () => {
 						<N8nIcon
 							v-if="!editorIsReadOnly"
 							data-test-id="code-editor-fullscreen-button"
-							icon="external-link-alt"
+							icon="external-link"
 							size="xsmall"
 							class="textarea-modal-opener"
 							:title="i18n.baseText('parameterInput.openEditWindow')"
@@ -1452,7 +1499,7 @@ onUpdated(async () => {
 					<template #suffix>
 						<N8nIcon
 							data-test-id="code-editor-fullscreen-button"
-							icon="external-link-alt"
+							icon="external-link"
 							size="xsmall"
 							class="textarea-modal-opener"
 							:title="i18n.baseText('parameterInput.openEditWindow')"
@@ -1498,7 +1545,7 @@ onUpdated(async () => {
 					<template #suffix>
 						<N8nIcon
 							v-if="!isReadOnly && !isSecretParameter"
-							icon="external-link-alt"
+							icon="external-link"
 							size="xsmall"
 							class="edit-window-button textarea-modal-opener"
 							:class="{
@@ -1576,7 +1623,7 @@ onUpdated(async () => {
 				@update:model-value="onUpdateTextInput"
 				@focus="setFocus"
 				@blur="onBlur"
-				@keydown.stop
+				@paste="onPasteNumber"
 			/>
 
 			<CredentialsSelect
